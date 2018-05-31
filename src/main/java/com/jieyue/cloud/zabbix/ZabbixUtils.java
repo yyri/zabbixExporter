@@ -64,9 +64,9 @@ public class ZabbixUtils {
 
 	public static enum QueryPeroid {
 
-		TODAY("today", 0, 0), ThreeDaySAgo("3daysago", 0, 0), SevenDaysAgo("7daysago", 0, 0), Double11("double11",
-				1510329600,
-				1510416000), Double12("double12", 1513008000, 1513094400), NewYear("newyear", 1514736000, 1514822400);
+		TODAY("today", 0, 0), ThreeDaySAgo("3daysago", 0, 0), SevenDaysAgo("7daysago", 0, 0), ThisWeek("ThisWeek", 0,
+				0), Double11("double11", 1510329600, 1510416000), Double12("double12", 1513008000,
+						1513094400), NewYear("newyear", 1514736000, 1514822400);
 
 		private String peroidKey;
 		private long from;
@@ -134,6 +134,9 @@ public class ZabbixUtils {
 		ZabbixUtils.QueryPeroid.ThreeDaySAgo.till = current - secondsOfADay * 3;
 		ZabbixUtils.QueryPeroid.SevenDaysAgo.from = current - secondsOfADay * 8;
 		ZabbixUtils.QueryPeroid.SevenDaysAgo.till = current - secondsOfADay * 7;
+		ZabbixUtils.QueryPeroid.ThisWeek.from = current - secondsOfADay * 7;
+		ZabbixUtils.QueryPeroid.ThisWeek.till = current;
+
 	}
 
 	/**
@@ -217,12 +220,12 @@ public class ZabbixUtils {
 		CsvWriter csvWriter = new CsvWriter(fileName, ',', Charset.forName("GBK"));
 
 		// 写表头
-		String[] headers = { "HostName", "HostID", "HostIP", "CPU Idle Avg", "CPU Idle Avg Samples Count",
-				"MemAvailable(GB)", "MemTotal(GB)", "UsedMem%" };
+		String[] headers = { "HostName", "HostID", "HostIP", "CPU Idle Avg", "CPU Idle Max", "CPU Idle Min",
+				"CPU Idle Avg Samples Count", "MemAvailable(GB)", "MemTotal(GB)", "UsedMem%" };
 		// , "15avg-2hours", "15avgMax-2hours", "15avgMin-2hours"
 		csvWriter.writeRecord(headers);
-		for (Iterator<Integer> itr = zabbixStore.keySet().iterator(); itr.hasNext();) {
-			ZabbixObject zo = (ZabbixObject) zabbixStore.get(itr.next());
+		for (Integer itr : zabbixStore.keySet()) {
+			ZabbixObject zo = (ZabbixObject) zabbixStore.get(itr);
 			csvWriter.writeRecord(zo.toArray());
 		}
 		csvWriter.close();
@@ -332,12 +335,16 @@ public class ZabbixUtils {
 	}
 
 	/**
+	 * 
+	 * @param zabbixApi
+	 * @param sn
 	 * @param zabbixStore
-	 * @param itemids
+	 * @param itemid
 	 * @param historyReq
+	 * @param average
 	 * @throws ZabbixApiException
 	 */
-	public static void getValueByItemId(ZabbixApi zabbixApi, int id, Map<Integer, ZabbixObject> zabbixStore,
+	public  void getValueByItemId(ZabbixApi zabbixApi, int sn, Map<Integer, ZabbixObject> zabbixStore,
 			Integer itemid, HistoryGetRequest historyReq, boolean average) throws ZabbixApiException {
 		List itemids = new ArrayList();
 		itemids.add(itemid);
@@ -352,7 +359,7 @@ public class ZabbixUtils {
 			if (history == null) {
 				continue;
 			}
-			log.debug(id + ":/Clock/ItemID/Value:" + history.getClock() + "/" + history.getItemid() + "/"
+			log.debug(sn + ":/Clock/ItemID/Value:" + history.getClock() + "/" + history.getItemid() + "/"
 					+ history.getValue());
 			ZabbixObject zo = ZabbixObject.findZabbixObjectByItemId(zabbixStore, history.getItemid());
 			if (zo == null) {
@@ -361,15 +368,22 @@ public class ZabbixUtils {
 			}
 			if (zo.getCpuPerf_cur_itemid() != null && history.getItemid().equals(zo.getCpuPerf_cur_itemid())) {
 				float curSum = 0;
+				float maxCpuPerf = 0;
+				float minCpuPerf = 9999;
 				if (average) {
+					// iterator CPU performance history and calculate AVG
 					itemValueList.add(Float.parseFloat(history.getValue()));
 					int count = 0;
-					for (Iterator<Float> itemValueItr = itemValueList.iterator(); itemValueItr.hasNext();) {
+					for (Float itemValue : itemValueList) {
 						count++;
-						curSum += itemValueItr.next();
+						curSum += itemValue;
+						maxCpuPerf = itemValue > maxCpuPerf ? itemValue : maxCpuPerf;
+						minCpuPerf = itemValue > minCpuPerf ? minCpuPerf : itemValue;
 					}
 					zo.setCpuPerf_cur(ZabbixUtils.fnum.format(curSum / count));
 					zo.setCpuPerf_samplesCount(count);
+					zo.setCpuPerf_max(maxCpuPerf);
+					zo.setCpuPerf_min(minCpuPerf);
 				} else {
 					zo.setCpuPerf_cur(history.getValue());
 				}
@@ -399,4 +413,39 @@ public class ZabbixUtils {
 		System.out.println(ZabbixUtils.QueryPeroid.TODAY.from);
 	}
 
+	/**
+	 * generate time series by given interval. like interval by an hour or half an
+	 * hour or 10 minutes to reduce load on the zabbix server and the request
+	 * duration.
+	 * 
+	 * @param zabbixApi
+	 * @param historyReq
+	 */
+	public static void getTimeSeries(ZabbixApi zabbixApi, HistoryGetRequest historyReq, int interval) {
+
+		// get the last time point by request the last one item order by clock.
+
+		// PROBLEM the sample item clock maybe not accurate.
+	}
+
+	/**
+	 * 
+	 * @param historyReq
+	 * @param history
+	 *            0 - numeric float; 1 - character; 2 - log; 3 - numeric unsigned; 4
+	 *            - text. Default: 3.
+	 * @param limit
+	 * @param orderField
+	 * @param order
+	 * @param peroid
+	 */
+	public static void setHistoryReqParams(HistoryGetRequest historyReq, int history, int limit, String orderField,
+			List order, ZabbixUtils.QueryPeroid peroid) {
+		historyReq.getParams().setOutput("extend");
+		historyReq.getParams().setHistory(history);
+		historyReq.getParams().setLimit(limit);
+		historyReq.getParams().setSortField(orderField);
+		historyReq.getParams().setSortorder(order);
+		ZabbixUtils.setTimePeriod(historyReq.getParams(), peroid);
+	}
 }

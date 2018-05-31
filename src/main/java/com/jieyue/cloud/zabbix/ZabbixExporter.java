@@ -30,24 +30,29 @@ import com.zabbix4j.item.ItemGetRequest;
 public class ZabbixExporter {
 
 	// Runtime Configuration
-	private int hostsLimit = 5;
-	// How many values will be fetched of a monitor item
-	private int itemValueCountLimit = 100;
+	private int hostsLimit = 100;
+	// How many values will be fetched of a monitor item.1 item every minute.1440
+	// item for one day.
+	private int itemValueCountLimit = 10;
 
 	private ZabbixApi zabbixApi = null;
 	private long start = 0;
 	private Logger log = LogManager.getLogger(this.getClass());
-	private String dataFileName = "c:/downloads/ZabbixData.csv";
+	private String dataFileName = "c:/downloads/ZabbixDataStaging.csv";
 
-	private String user = "admin";
 	// 鹏博生产
-	// private String password = "fVRFjcNkbDVs";
-	// 鹏博士准生产
-	private String password = "123456";
+//	private String zabbixUrl = "http://172.16.101.17/zabbix/api_jsonrpc.php";
+//	private String user = "admin";
+//	private String password = "fVRFjcNkbDVs";
 	// 鹏博士准生产
 	private String zabbixUrl = "http://172.18.100.227/zabbix/api_jsonrpc.php";
-	// 鹏博士生产
-	// private String zabbixUrl = "http://172.16.101.17/zabbix/api_jsonrpc.php";
+	private String user = "admin";
+	private String password = "123456";
+
+	// cloud
+//	private String zabbixUrl = "http://10.50.243.113/zabbix/api_jsonrpc.php";
+//	private String user = "Admin";
+//	private String password = "zabbix";
 
 	HistoryGetRequest historyReqofCPU = new HistoryGetRequest();
 	HistoryGetRequest historyReqofMEM = new HistoryGetRequest();
@@ -55,9 +60,9 @@ public class ZabbixExporter {
 	@Before
 	public void initTests() throws ZabbixApiException {
 
-		setHistoryReqParams(historyReqofCPU, 0, itemValueCountLimit, "clock", ZabbixUtils.getSortInDesc(),
+		ZabbixUtils.setHistoryReqParams(historyReqofCPU, 0, itemValueCountLimit, "clock", ZabbixUtils.getSortInDesc(),
 				ZabbixUtils.QueryPeroid.TODAY);
-		setHistoryReqParams(historyReqofMEM, 3, itemValueCountLimit, "clock", ZabbixUtils.getSortInDesc(),
+		ZabbixUtils.setHistoryReqParams(historyReqofMEM, 3, itemValueCountLimit, "clock", ZabbixUtils.getSortInDesc(),
 				ZabbixUtils.QueryPeroid.TODAY);
 
 		start = System.currentTimeMillis();
@@ -69,7 +74,7 @@ public class ZabbixExporter {
 	}
 
 	@Test
-	public void exportMonData() {
+	public void exportMonData() throws IOException {
 		Map<Integer, ZabbixObject> zabbixStore = new HashMap();
 		List hostIdList = new ArrayList();
 		List<Integer> cpuloadItemids = new ArrayList<>();
@@ -103,23 +108,27 @@ public class ZabbixExporter {
 			// get cpuLoad item values
 			for (Integer cpuPerfItemid : cpuloadItemids) {
 				i++;
-				ZabbixUtils.getValueByItemId(zabbixApi, i, zabbixStore, cpuPerfItemid, historyReqofCPU, true);
-				for (Integer zsKey : zabbixStore.keySet()) {
-					ZabbixObject zo = (ZabbixObject) zabbixStore.get(zsKey);
-					log.info(zo.toArray().toString());
-				}
+				new ZabbixUtils().getValueByItemId(zabbixApi, i, zabbixStore, cpuPerfItemid, historyReqofCPU, true);
 			}
 
 			// get mem item values
 			i = 0;
 			for (Integer memItemId : memItemids) {
 				i++;
-				ZabbixUtils.getValueByItemId(zabbixApi, i, zabbixStore, memItemId, historyReqofMEM, false);
+				new ZabbixUtils().getValueByItemId(zabbixApi, i, zabbixStore, memItemId, historyReqofMEM, false);
 			}
+			
+			
+//			for (Integer zsKey : zabbixStore.keySet()) {
+//				ZabbixObject zo = (ZabbixObject) zabbixStore.get(zsKey);
+//				log.debug(zo.toArray().toString());
+//			}
 
 			ZabbixUtils.writeCsv(zabbixStore, dataFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			ZabbixUtils.writeCsv(zabbixStore, dataFileName);
 		}
 
 	}
@@ -130,22 +139,4 @@ public class ZabbixExporter {
 		log.info("Time Cost:" + (int) ((end - start) / 1000) + " seconds.");
 	}
 
-	/**
-	 * 
-	 * @param historyReq
-	 * @param history
-	 * @param limit
-	 * @param orderField
-	 * @param order
-	 * @param peroid
-	 */
-	private void setHistoryReqParams(HistoryGetRequest historyReq, int history, int limit, String orderField,
-			List order, ZabbixUtils.QueryPeroid peroid) {
-		historyReq.getParams().setOutput("extend");
-		historyReq.getParams().setHistory(history);
-		historyReq.getParams().setLimit(limit);
-		historyReq.getParams().setSortField(orderField);
-		historyReq.getParams().setSortorder(order);
-		ZabbixUtils.setTimePeriod(historyReq.getParams(), peroid);
-	}
 }

@@ -26,11 +26,14 @@ public class ZabbixObject {
 	private String cpuPerf_cur = "";
 	private Integer cpuPerf_cur_itemid = 0;
 	private Integer cpuPerf_samplesCount = 0;
+	private Float cpuPerf_max = (float) 0;
+	private Float cpuPerf_min = (float) 0;
 
 	private Integer memTotal = 0;
 	private Integer memAvailable = 0;
 	private Integer memTotalItemID = 0;
 	private Integer memAvailableItemID = 0;
+
 	DecimalFormat fnum = new DecimalFormat("#.##%");
 
 	private static int RatesOfBytesToGiB = 1024 * 1024 * 1024;
@@ -133,8 +136,9 @@ public class ZabbixObject {
 		// log.debug("cpuPerf_cur:" + cpuPerf_cur);
 		// log.debug("avg15_2hours:" + avg15_2hours);
 
-		return new String[] { hostname, hostid.toString(), hostips.toString(), cpuPerf_cur,
-				cpuPerf_samplesCount.toString(), memAvailable.toString(), memTotal.toString(), getUsedMemPercent() };
+		return new String[] { hostname, hostid.toString(), hostips.toString(), cpuPerf_cur, cpuPerf_max.toString(),
+				cpuPerf_min.toString(), cpuPerf_samplesCount.toString(), memAvailable.toString(), memTotal.toString(),
+				getUsedMemPercent() };
 	}
 
 	private String getUsedMemPercent() {
@@ -252,4 +256,33 @@ public class ZabbixObject {
 		return null;
 	}
 
+	/**
+	 * @return the cpuPerf_max
+	 */
+	public Float getCpuPerf_max() {
+		return cpuPerf_max;
+	}
+
+	/**
+	 * @param cpuPerf_max
+	 *            the cpuPerf_max to set
+	 */
+	public void setCpuPerf_max(Float cpuPerf_max) {
+		this.cpuPerf_max = cpuPerf_max;
+	}
+
+	/**
+	 * @return the cpuPerf_min
+	 */
+	public Float getCpuPerf_min() {
+		return cpuPerf_min;
+	}
+
+	/**
+	 * @param cpuPerf_min
+	 *            the cpuPerf_min to set
+	 */
+	public void setCpuPerf_min(Float cpuPerf_min) {
+		this.cpuPerf_min = cpuPerf_min;
+	}
 }
