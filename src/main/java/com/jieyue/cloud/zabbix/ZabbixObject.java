@@ -26,15 +26,18 @@ public class ZabbixObject {
 	private String cpuPerf_cur = "";
 	private Integer cpuPerf_cur_itemid = 0;
 	private Integer cpuPerf_samplesCount = 0;
-	private Float cpuPerf_max = (float) 0;
-	private Float cpuPerf_min = (float) 0;
+	private Float cpuPerf_max = (float) 0.00;
+	private Float cpuPerf_min = (float) 0.00;
 
 	private Integer memTotal = 0;
-	private Integer memAvailable = 0;
+	private Float memAvailable = (float) 0.00;
+	private Float memFree = (float) 0.00;
 	private Integer memTotalItemID = 0;
 	private Integer memAvailableItemID = 0;
+	private Integer memFreeItemID = 0;
 
 	DecimalFormat fnum = new DecimalFormat("#.##%");
+	DecimalFormat fnumround = new DecimalFormat("#.##");
 
 	private static int RatesOfBytesToGiB = 1024 * 1024 * 1024;
 
@@ -91,7 +94,7 @@ public class ZabbixObject {
 	/**
 	 * @return the memAvailable
 	 */
-	public Integer getMemAvailable() {
+	public float getMemAvailable() {
 		return memAvailable;
 	}
 
@@ -99,19 +102,37 @@ public class ZabbixObject {
 	 * @param memAvailable
 	 *            the memAvailable to set
 	 */
-	public void setMemAvailable(Integer memAvailable) {
+	public void setMemAvailable(Float memAvailable) {
 		this.memAvailable = memAvailable;
+		this.memFree = memAvailable;
 	}
 
 	public void setMemAvailable(String memAvailable) {
-
+		float result = 0f;
 		try {
-			Long tmp = (new Long(memAvailable)) / RatesOfBytesToGiB;
-			this.memAvailable = tmp.intValue();
+			result = Float.valueOf(fnumround.format((float) (new Long(memAvailable)) / RatesOfBytesToGiB));
 		} catch (NumberFormatException e) {
 			e.printStackTrace();
-			this.memAvailable = 0;
+			result = (float) 0.00;
 		}
+		this.setMemAvailable(result);
+	}
+
+	/**
+	 * @param memFree
+	 *            the memFree to set
+	 */
+	public void setMemFree(String memFree) {
+		this.setMemAvailable(memFree);
+	}
+
+	/**
+	 * @param memFree
+	 *            the memFree to set
+	 */
+	public void setMemFree(Float memFree) {
+		this.memFree = memFree;
+		this.memAvailable = this.memFree;
 	}
 
 	/**
@@ -145,14 +166,14 @@ public class ZabbixObject {
 		if (memAvailable == 0 || memTotal == 0) {
 			return "";
 		}
-		return fnum.format((float) (memTotal - memAvailable) / memTotal);
+		return fnum.format((float) ((memTotal - memAvailable) <= 0 ? 0 : (memTotal - memAvailable)) / memTotal);
 
 	}
 
 	@Test
 	public void testDecimalFormat() {
 		this.memTotal = 7;
-		this.memAvailable = 6;
+		this.memAvailable = (float) 0.5;
 		log.debug(fnum.format((float) (memTotal - memAvailable) / memTotal));
 	}
 
@@ -249,7 +270,7 @@ public class ZabbixObject {
 		for (Object zsKey : zabbixStore.keySet()) {
 			ZabbixObject zo = (ZabbixObject) zabbixStore.get(zsKey);
 			if (zo.getCpuPerf_cur_itemid().equals(itemid) || zo.getMemAvailableItemID().equals(itemid)
-					|| zo.getMemTotalItemID().equals(itemid)) {
+					|| zo.getMemTotalItemID().equals(itemid) || zo.getMemFreeItemID().equals(itemid)) {
 				return zo;
 			}
 		}
@@ -285,4 +306,37 @@ public class ZabbixObject {
 	public void setCpuPerf_min(Float cpuPerf_min) {
 		this.cpuPerf_min = cpuPerf_min;
 	}
+
+	/**
+	 * @return the memFree
+	 */
+	public Float getMemFree() {
+		return memFree;
+	}
+
+	/**
+	 * @return the memFreeItemID
+	 */
+	public Integer getMemFreeItemID() {
+		return memFreeItemID;
+	}
+
+	/**
+	 * @param memFreeItemID
+	 *            the memFreeItemID to set
+	 */
+	public void setMemFreeItemID(Integer memFreeItemID) {
+		this.memFreeItemID = memFreeItemID;
+	}
+
+	@Test
+	public void testSmallMem() {
+		this.setMemTotal("8252801024");
+		// this.setMemAvailable("525280102");
+		this.setMemFree("525280102");
+		log.debug(this.getMemAvailable());
+		log.debug(this.getMemFree());
+		log.debug(this.getUsedMemPercent());
+	}
+
 }

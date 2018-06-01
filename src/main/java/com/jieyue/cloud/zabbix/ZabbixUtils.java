@@ -42,13 +42,24 @@ import com.zabbix4j.item.ItemObject;
  */
 public class ZabbixUtils {
 	private static Logger log = LogManager.getLogger(com.jieyue.cloud.zabbix.ZabbixUtils.class);
+
+	public static String memorySearchKey = "memory";
+	public static String memFreeName = "Free memory";
 	public static String memTotalName = "Total memory";
 	public static String memAvailableName = "Available memory";
+	
 	public static String cpuavg15SearchKey = "cpu";
 	public static String cpuavg15SearchName = "Processor load (1 min average per core)";
-	public static String cpuIdleTimeSearchKey = "system.cpu.util[,idle]";
+	public static String cpuIdleTimeSearchKey = "system.cpu.util";
+	public static String cpuIdleTimeKeyofLinux = "system.cpu.util[,idle]";
+	public static String cpuIdleTimeKeyofWin = "system.cpu.util[,,]";
+	public static String cpuUserTimeSearchKey = "system.cpu.util";
+	public static String cpuUserTimeKeyofLinux = "system.cpu.util[,user]";
+	public static String cpuUserTimeKeyofWin = "system.cpu.util[,,]";
+
 	public static String datetimeFormat = "yyyy-MM-dd HH:mm:ss";
 	public static DecimalFormat fnum = new DecimalFormat("##0.0000");
+	public static SimpleDateFormat sdf = new SimpleDateFormat(datetimeFormat, Locale.CHINA);
 
 	private static List sortInDesc = null;
 	private static List sortInAsc = null;
@@ -150,9 +161,6 @@ public class ZabbixUtils {
 		return ZabbixUtils.sdf.parse(dateInStr).getTime();
 	}
 
-	public static SimpleDateFormat sdf = new SimpleDateFormat(datetimeFormat, Locale.CHINA);
-	public static String memorySearchKey = "memory";
-
 	public static Long getCurrentUnixTimeStamp() {
 		return System.currentTimeMillis() / 1000;
 	}
@@ -164,14 +172,10 @@ public class ZabbixUtils {
 	}
 
 	public static String unixTimeStamp2Date(Long timestamp) {
-		String date = ZabbixUtils.sdf.format(new Date(timestamp * 1000));
-		return date;
-	}
 
-	@Test
-	public void testDateStrToTS() throws ParseException {
-		log.debug(ZabbixUtils.date2Timestamp("2018-01-02 00:00:00"));
-		log.debug(System.currentTimeMillis());
+		String date = ZabbixUtils.sdf
+				.format(new Date(timestamp.toString().length() > 10 ? timestamp : timestamp * 1000));
+		return date;
 	}
 
 	/**
@@ -215,13 +219,13 @@ public class ZabbixUtils {
 	/**
 	 * @throws IOException
 	 */
-	public static void writeCsv(Map<Integer, ZabbixObject> zabbixStore, String fileName) throws IOException {
+	public static void exportToCsv(Map<Integer, ZabbixObject> zabbixStore, String fileName) throws IOException {
 		// 创建CSV写对象
 		CsvWriter csvWriter = new CsvWriter(fileName, ',', Charset.forName("GBK"));
 
 		// 写表头
-		String[] headers = { "HostName", "HostID", "HostIP", "CPU Idle Avg", "CPU Idle Max", "CPU Idle Min",
-				"CPU Idle Avg Samples Count", "MemAvailable(GB)", "MemTotal(GB)", "UsedMem%" };
+		String[] headers = { "HostName", "HostID", "HostIP", "CPU UserTime Avg", "CPU UserTime Max", "CPU UserTime Min",
+				"CPU UserTime Samples Count", "MemAvailable(GB)", "MemTotal(GB)", "UsedMem%" };
 		// , "15avg-2hours", "15avgMax-2hours", "15avgMin-2hours"
 		csvWriter.writeRecord(headers);
 		for (Integer itr : zabbixStore.keySet()) {
@@ -249,12 +253,15 @@ public class ZabbixUtils {
 		log.info("CpuPerf Itemids Result Size:" + itemResp.getResult().size());
 		for (ItemObject item : itemResp.getResult()) {
 			i++;
-			log.info(
-					i + ":" + "HostID/Name/ItemID:" + item.getHostid() + "/" + item.getName() + "/" + item.getItemid());
-			ZabbixObject zo = (ZabbixObject) zabbixStore.get(item.getHostid());
-			zo.setCpuPerf_cur_itemid(item.getItemid());
-			itemids.add(item.getItemid());
-			zabbixStore.put(item.getHostid(), zo);
+			if (item.getKey_().equals(ZabbixUtils.cpuUserTimeKeyofLinux)
+					|| item.getKey_().equals(ZabbixUtils.cpuUserTimeKeyofWin)) {
+				log.debug(i + ":" + "HostID/Name/ItemID:" + item.getHostid() + "/" + item.getName() + "/"
+						+ item.getItemid());
+				ZabbixObject zo = (ZabbixObject) zabbixStore.get(item.getHostid());
+				zo.setCpuPerf_cur_itemid(item.getItemid());
+				itemids.add(item.getItemid());
+				zabbixStore.put(item.getHostid(), zo);
+			}
 		}
 	}
 
@@ -277,6 +284,8 @@ public class ZabbixUtils {
 				zo.setMemAvailableItemID(item.getItemid());
 			} else if (item.getName().equals(ZabbixUtils.memTotalName)) {
 				zo.setMemTotalItemID(item.getItemid());
+			} else if (item.getName().equals(ZabbixUtils.memFreeName)) {
+				zo.setMemFreeItemID(item.getItemid());
 			}
 			itemids.add(item.getItemid());
 			zabbixStore.put(item.getHostid(), zo);
@@ -344,8 +353,8 @@ public class ZabbixUtils {
 	 * @param average
 	 * @throws ZabbixApiException
 	 */
-	public  void getValueByItemId(ZabbixApi zabbixApi, int sn, Map<Integer, ZabbixObject> zabbixStore,
-			Integer itemid, HistoryGetRequest historyReq, boolean average) throws ZabbixApiException {
+	public void getValueByItemId(ZabbixApi zabbixApi, int sn, Map<Integer, ZabbixObject> zabbixStore, Integer itemid,
+			HistoryGetRequest historyReq, boolean average) throws ZabbixApiException {
 		List itemids = new ArrayList();
 		itemids.add(itemid);
 		historyReq.getParams().setItemids(itemids);
@@ -391,6 +400,8 @@ public class ZabbixUtils {
 				zo.setMemAvailable(history.getValue());
 			} else if (zo.getMemTotalItemID() != null && history.getItemid().equals(zo.getMemTotalItemID())) {
 				zo.setMemTotal(history.getValue());
+			} else if (zo.getMemFreeItemID() != null && history.getItemid().equals(zo.getMemFreeItemID())) {
+				zo.setMemFree(history.getValue());
 			}
 			zabbixStore.put(zo.getHostid(), zo);
 		}
@@ -447,5 +458,12 @@ public class ZabbixUtils {
 		historyReq.getParams().setSortField(orderField);
 		historyReq.getParams().setSortorder(order);
 		ZabbixUtils.setTimePeriod(historyReq.getParams(), peroid);
+	}
+
+	@Test
+	public void testDateStrToTS() throws ParseException {
+		log.debug(ZabbixUtils.date2Timestamp("2018-06-01 08:39:00"));
+		log.debug(System.currentTimeMillis());
+		log.debug(ZabbixUtils.unixTimeStamp2Date(System.currentTimeMillis()));
 	}
 }

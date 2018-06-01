@@ -124,11 +124,11 @@ public class ZabbixExporter {
 //				log.debug(zo.toArray().toString());
 //			}
 
-			ZabbixUtils.writeCsv(zabbixStore, dataFileName);
+			ZabbixUtils.exportToCsv(zabbixStore, dataFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
-			ZabbixUtils.writeCsv(zabbixStore, dataFileName);
+			ZabbixUtils.exportToCsv(zabbixStore, dataFileName);
 		}
 
 	}

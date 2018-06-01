@@ -102,7 +102,9 @@ public class ZabbixMTExporter {
 		ItemGetRequest itemReq = new ItemGetRequest();
 		Map<String, String> filter = new HashMap<String, String>();
 		// filter.put("key_", ZabbixUtils.cpuavg15SearchKey);
-		filter.put("key_", ZabbixUtils.cpuIdleTimeSearchKey);
+		// use user time instead of idle time
+		// filter.put("key_", ZabbixUtils.cpuIdleTimeSearchKey);
+		filter.put("key_", ZabbixUtils.cpuUserTimeSearchKey);
 		// filter.put("name", ZabbixUtils.cpuavg15SearchName);
 		ZabbixUtils.getCpuPerfItemid(zabbixApi, zabbixStore, hostIdList, cpuloadItemids, filter, itemReq);
 
@@ -143,11 +145,17 @@ public class ZabbixMTExporter {
 			Thread.sleep(1000);
 		}
 
-		ZabbixUtils.writeCsv(zabbixStore, dataFileName + zabbixName + System.currentTimeMillis() + ".csv");
+		ZabbixUtils.exportToCsv(zabbixStore,
+				dataFileName + zabbixName
+						+ ZabbixUtils.unixTimeStamp2Date(historyReqofCPU.getParams().getTime_from()).replaceAll("-", "")
+								.replaceAll(" ", "_").replaceAll(":", "")
+						+ "-" + ZabbixUtils.unixTimeStamp2Date(historyReqofCPU.getParams().getTime_till())
+								.replaceAll("-", "").replaceAll(" ", "_").replaceAll(":", "")
+						+ ".csv");
 
 		log.info("All threads exit.\r\nMain thread exting...");
 		long end = System.currentTimeMillis();
-		log.info("Time Cost:" + (int) ((end - start) / 1000) + " seconds.");
+		log.info("Time Cost:" + (int) ((end - start) / 1000) + " Seconds.");
 	}
 
 }
