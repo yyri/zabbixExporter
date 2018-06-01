@@ -9,5 +9,6 @@ Zabbix connector with  com.github.0312birdzhang.Zabbix4j.
 			<version>0.1.9</version>
 		</dependency>
 
+Unfortunatelly this lib doesn't support zabbix3.
 		
 		
